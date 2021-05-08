@@ -1,0 +1,100 @@
+Fall 2021 Data Science Intern Challenge
+Mariana Mariles 
+
+########################################################
+Question 1
+########################################################
+A. Think about what could be going wrong with our calculation. Think about a better way to evaluate this data. 
+
+What can be going wrong is that naively calculating AOV is just the average of the order_amount column. Simply highlighting the column gives that average in excel. A better way is adjusting the price to the number of items and then getting the average. In addition, however, there may be outliers that may be influencing the average. Thus, we look at mode and median to be more confident in the average. 
+
+B. What metric would you report for this dataset?
+The options can be the median, mode or adjusted mean. In this case, I would report the median.  
+
+C. What is its value?
+about $153
+
+Supporting code details (Python):
+Note: The following was done on google colab
+
+# Make connection to google sheets 
+from google.colab import auth
+auth.authenticate_user()
+# Library imports 
+import gspread
+from oauth2client.client import GoogleCredentials
+import pandas as pd
+from google.colab import files
+
+# Authentication of google account 
+gc = gspread.authorize(GoogleCredentials.get_application_default())
+
+# Open Google Sheet (sheet 1) based on name
+worksheet = gc.open('Shopify Data').sheet1
+
+# Get a list of rows
+rows1 = worksheet.get_all_values()
+# Convert list of rows to a DataFrame
+data = pd.DataFrame.from_records(rows1[1:], columns=rows1[0])
+# View column names of dataframe
+data.columns
+
+# Convert order_amount, total_items to integer types 
+data.order_amount = data.order_amount.astype(int)
+data.total_items = data.total_items.astype(int)
+
+data['amount_per_item'] = data['order_amount'] / data['total_items']
+
+# Calculate mean, median, and mode 
+old_mean = data['order_amount'].mean()
+mean = data['amount_per_item'].mean()
+median = data['amount_per_item'].median()
+mode = data['amount_per_item'].mode()
+
+# Print findings 
+print(f'The previous aov calculated was {old_mean}')
+print(f'For the provided dataset, the mean is {mean}, median of {median}, and mode of {mode.at[0,]}')
+
+# Make adjustments to mean
+data['p_score'] = (data['amount_per_item'] / mean) * 100
+data_outlier = data.loc[data.p_score > 100]
+print('There are a few outliers that must be accounted for,', len(data_outlier))
+data= data.loc[data.p_score <= 100]
+new_mean = data['amount_per_item'].mean()
+print(f'Adjusted aov calculated is {new_mean}')
+
+########################################################
+Question 2 (SQL)
+########################################################
+A. How many orders were shipped by Speedy Express in total? 
+Answer: 54
+
+SELECT shippers.shipperName, COUNT(orders.shipperID) AS orderAmount
+FROM orders, shippers
+WHERE shippers.shipperID=orders.shipperID AND ShipperName = 'Speedy Express'
+GROUP BY orders.shipperID;
+
+B. What is the last name of the employee with the most orders?
+Answer: Handel
+
+SELECT customerName AS Name, MAX(orderAmount) 
+FROM (SELECT Customers.customerName, COUNT(orders.customerID) AS orderAmount
+FROM orders, Customers
+WHERE Customers.customerID=orders.customerID
+GROUP BY orders.customerID);
+
+C. What product was ordered the most by customers in Germany?
+Answer: Gorgonzola Telino
+
+SELECT Country, productName, MAX(prodAmount) 
+FROM (SELECT Country, productName, products.productID, COUNT(products.productID) AS prodAmount 
+FROM (SELECT Country, table1.OrderID, productID
+FROM orderDetails
+JOIN (SELECT Country, orders.OrderID
+FROM orders, Customers 
+WHERE Customers.CustomerID=orders.CustomerID AND Country = 'Germany') AS table1 ON table1.OrderID=orderDetails.OrderID) AS table1_v2, products
+WHERE table1_v2.ProductID = products.ProductID
+GROUP BY products.productID);
+
+        
+
